@@ -14,7 +14,7 @@ export default function Home() {
           priority
         />
         <div className={styles.intro}>
-          <h1>Filiberto Meraz III - CST-391 Mustic app</h1>
+          <h1>CST-391 Mustic app With Next.js this class is good</h1>
           <p>
             Looking for a starting point or more instructions? Head over to{" "}
             <a

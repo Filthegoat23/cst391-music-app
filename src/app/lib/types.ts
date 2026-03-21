@@ -15,3 +15,19 @@ export type Album = {
   description?: string | null;
   tracks?: Track[];
 };
+
+export type Playlist = {
+  id: number;
+  name: string;
+  user_id?: number | null;
+  created_at?: string;
+  track_count?: number;
+  tracks?: Track[];
+};
+
+export type PlaylistTrack = {
+  id: number;
+  playlist_id: number;
+  track_id: number;
+  position: number;
+};

@@ -1,66 +1,57 @@
-import Image from "next/image";
-import styles from "./page.module.css";
+'use client';
+// app/page.tsx — Home page
+// Loads all albums from the API, supports search filtering,
+// and renders them as a grid of AlbumCards via SearchAlbum.
 
-export default function Home() {
+import { useState, useEffect, useMemo } from 'react';
+import { get } from '@/lib/apiClient';
+import { Album } from '@/app/lib/types';
+import SearchAlbum from './components/SearchAlbum';
+
+export default function Page() {
+  const [albumList, setAlbumList] = useState<Album[]>([]);
+  const [searchPhrase, setSearchPhrase] = useState('');
+  const [error, setError] = useState('');
+
+  // Load all albums from the API on first render
+  useEffect(() => {
+    get<Album[]>('/albums')
+      .then((data) => setAlbumList(data))
+      .catch((err: Error) => setError(err.message));
+  }, []);
+
+  // Filter albums client-side based on the search phrase
+  const filteredAlbums = useMemo(() => {
+    const phrase = searchPhrase.trim().toLowerCase();
+    if (!phrase) return albumList;
+    return albumList.filter((a) => {
+      const desc = (a.description ?? '').toLowerCase();
+      const title = (a.title ?? '').toLowerCase();
+      return desc.includes(phrase) || title.includes(phrase);
+    });
+  }, [albumList, searchPhrase]);
+
   return (
-    <div className={styles.page}>
-      <main className={styles.main}>
-        <Image
-          className={styles.logo}
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className={styles.intro}>
-          <h1>CST-391 Mustic app With Next.js this class is good</h1>
-          <p>
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <main className="container mt-3">
+      <h1 className="mb-1">CST-391 Music App</h1>
+      <p className="text-muted mb-4">Filiberto Meraz — Album count: {albumList.length}</p>
+
+      {/* Show error message if API call failed */}
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          Failed to load albums: {error}
         </div>
-        <div className={styles.ctas}>
-          <a
-            className={styles.primary}
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className={styles.logo}
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className={styles.secondary}
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+      )}
+
+      {/* Show loading message while albums are being fetched */}
+      {!error && albumList.length === 0 && (
+        <p className="text-muted">Loading albums...</p>
+      )}
+
+      {/* Main album search + grid */}
+      {!error && albumList.length > 0 && (
+        <SearchAlbum albums={filteredAlbums} onSearch={setSearchPhrase} />
+      )}
+    </main>
   );
 }

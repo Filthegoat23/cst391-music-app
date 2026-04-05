@@ -1,17 +1,11 @@
 'use client';
 // NavBar.tsx — shared component, lives in /components (not routed)
 // Uses Next.js <Link> instead of react-router-dom
-// Bootstrap JS loaded dynamically so it only runs in the browser (not SSR)
+// Bootstrap JS is loaded via CDN in layout.tsx
 
 import Link from 'next/link';
-import { useEffect } from 'react';
 
 export default function NavBar() {
-  useEffect(() => {
-    // @ts-expect-error: Bootstrap's JS bundle lacks TypeScript definitions.
-    // Loaded dynamically so it only runs client-side — safe to ignore.
-    import('bootstrap/dist/js/bootstrap.bundle.min.js');
-  }, []);
 
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark mb-4">

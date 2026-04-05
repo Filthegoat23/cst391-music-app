@@ -9,12 +9,16 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@popperjs/core": "^2.11.8",
+    "bootstrap": "^5.3.8",
+    "docx": "^9.6.1",
     "next": "16.1.6",
     "pg": "^8.18.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
+    "@types/bootstrap": "^5.2.10",
     "@types/node": "^20",
     "@types/pg": "^8.16.0",
     "@types/react": "^19",

@@ -10,7 +10,7 @@ export default function NavBar() {
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
       <div className="container">
-        <span className="navbar-brand">🎵 Music App — Filiberto Meraz</span>
+        <span className="navbar-brand">Music App — Filiberto Meraz</span>
 
         <button
           className="navbar-toggler"

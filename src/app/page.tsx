@@ -1,7 +1,4 @@
 "use client";
-// app/page.tsx — Home page
-// Loads all albums from the API, supports search filtering,
-// and renders them as a grid of AlbumCards via SearchAlbum.
 
 import { useState, useEffect, useMemo } from "react";
 import { get } from "@/lib/apiClient";
@@ -13,14 +10,12 @@ export default function Page() {
   const [searchPhrase, setSearchPhrase] = useState("");
   const [error, setError] = useState("");
 
-  // Load all albums from the API on first render
   useEffect(() => {
     get<Album[]>("/albums")
       .then((data) => setAlbumList(data))
       .catch((err: Error) => setError(err.message));
   }, []);
 
-  // Filter albums client-side based on the search phrase
   const filteredAlbums = useMemo(() => {
     const phrase = searchPhrase.trim().toLowerCase();
     if (!phrase) return albumList;
@@ -37,19 +32,15 @@ export default function Page() {
       <p className="text-muted mb-4">
         Filiberto Meraz — Album count: {albumList.length}
       </p>
-      <pre
-        style={{
-          backgroundColor: "#f4f4f4",
-          padding: "1rem",
-          borderRadius: "8px",
-          overflow: "auto",
-          color: "#111",
-          fontSize: "0.9rem",
-        }}
-      >
-        {albumList.length > 0 && JSON.stringify(albumList, null, 2)}
-      </pre>
-      {albumList.length === 0 && <p>Loading albums...</p>}
+      {error && (
+        <div className="alert alert-danger">Failed to load albums: {error}</div>
+      )}
+      {!error && albumList.length === 0 && (
+        <p className="text-muted">Loading albums...</p>
+      )}
+      {!error && albumList.length > 0 && (
+        <SearchAlbum albums={filteredAlbums} onSearch={setSearchPhrase} />
+      )}
     </main>
   );
 }

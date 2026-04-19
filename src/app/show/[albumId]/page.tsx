@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { get } from '@/lib/apiClient';
 import { Album, Track } from '@/app/lib/types';
 import TracksList from '@/app/components/TracksList';
@@ -19,6 +20,10 @@ export default function ShowAlbumPage() {
   const [album, setAlbum] = useState<Album | null>(null);
   const [selectedTrack, setSelectedTrack] = useState<Track | null>(null);
   const [error, setError] = useState('');
+
+  // Only admins can see the Edit Album button
+  const { data: session } = useSession();
+  const isAdmin = session?.user?.role === 'admin';
 
   useEffect(() => {
     if (!albumId) return;
@@ -65,7 +70,10 @@ export default function ShowAlbumPage() {
 
           <div className="d-flex gap-2 mt-3">
             <button className="btn btn-outline-secondary btn-sm" onClick={() => router.push('/')}>Back</button>
-            <button className="btn btn-outline-primary btn-sm" onClick={() => router.push(`/edit/${albumId}`)}>Edit Album</button>
+            {/* Only show Edit Album to admins */}
+            {isAdmin && (
+              <button className="btn btn-outline-primary btn-sm" onClick={() => router.push(`/edit/${albumId}`)}>Edit Album</button>
+            )}
           </div>
         </div>
       </div>

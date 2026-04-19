@@ -1,16 +1,27 @@
 'use client';
-// NavBar.tsx — shared component, lives in /components (not routed)
-// Uses Next.js <Link> instead of react-router-dom
-// Bootstrap JS is loaded via CDN in layout.tsx
+// NavBar.tsx — shared navigation component
+// Uses useSession() to show/hide links based on authentication state:
+//   Guest   → sees Sign In only
+//   User    → sees Sign Out and About
+//   Admin   → sees New Album, About, and Sign Out
 
 import Link from 'next/link';
+import { useSession, signIn, signOut } from 'next-auth/react';
 
 export default function NavBar() {
+  // Get the current session — status is 'loading', 'authenticated', or 'unauthenticated'
+  const { data: session, status } = useSession();
+
+  const isAuthenticated = status === 'authenticated';
+  const isAdmin = session?.user?.role === 'admin';
 
   return (
     <nav className="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
       <div className="container">
-        <span className="navbar-brand">Music App — Filiberto Meraz</span>
+        {/* Brand links to home page — 'Main' nav link removed per Activity 6 */}
+        <Link href="/" className="navbar-brand">
+          Music App — Filiberto Meraz
+        </Link>
 
         <button
           className="navbar-toggler"
@@ -26,15 +37,42 @@ export default function NavBar() {
 
         <div className="collapse navbar-collapse" id="navbarNav">
           <ul className="navbar-nav ms-auto">
-            <li className="nav-item">
-              <Link href="/" className="nav-item nav-link">Main</Link>
-            </li>
-            <li className="nav-item">
-              <Link href="/new" className="nav-item nav-link">New Album</Link>
-            </li>
-            <li className="nav-item">
-              <Link href="/about" className="nav-item nav-link">About</Link>
-            </li>
+
+            {/* Only admins can create new albums */}
+            {isAdmin && (
+              <li className="nav-item">
+                <Link href="/new" className="nav-link">New Album</Link>
+              </li>
+            )}
+
+            {/* About is visible to all authenticated users */}
+            {isAuthenticated && (
+              <li className="nav-item">
+                <Link href="/about" className="nav-link">About</Link>
+              </li>
+            )}
+
+            {/* Show Sign In when logged out, Sign Out when logged in */}
+            {!isAuthenticated ? (
+              <li className="nav-item">
+                <button
+                  className="nav-link btn btn-link"
+                  onClick={() => signIn('github')}
+                >
+                  Sign In
+                </button>
+              </li>
+            ) : (
+              <li className="nav-item">
+                <button
+                  className="nav-link btn btn-link"
+                  onClick={() => signOut()}
+                >
+                  Sign Out
+                </button>
+              </li>
+            )}
+
           </ul>
         </div>
       </div>

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import NavBar from "./components/NavBar";
+import SessionWrapper from "./SessionWrapper";
 
 export const metadata: Metadata = {
-  title: "CST-391 Music App",
+  // Activity 6: updated title to "Music App"
+  title: "Music App",
   description: "Filiberto Meraz — Music App built with Next.js",
 };
 
@@ -24,8 +26,11 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <NavBar />
-        {children}
+        {/* SessionWrapper makes useSession() available in all client components */}
+        <SessionWrapper>
+          <NavBar />
+          {children}
+        </SessionWrapper>
         {/* Bootstrap JS via CDN */}
         <script
           src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"

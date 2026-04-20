@@ -45,6 +45,13 @@ export default function NavBar() {
               </li>
             )}
 
+            {/* Playlists visible to all authenticated users */}
+            {isAuthenticated && (
+              <li className="nav-item">
+                <Link href="/playlists" className="nav-link">Playlists</Link>
+              </li>
+            )}
+
             {/* About is visible to all authenticated users */}
             {isAuthenticated && (
               <li className="nav-item">

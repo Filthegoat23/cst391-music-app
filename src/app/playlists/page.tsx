@@ -1,18 +1,38 @@
 'use client';
+// playlists/page.tsx — Playlist List Page
+// RBAC:
+//   Guest   → redirected to sign in
+//   User    → can view playlists
+//   Admin   → can view AND create/delete playlists
 
 import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Playlist } from '@/app/lib/types';
 
 export default function PlaylistsPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const isAdmin = session?.user?.role === 'admin';
+
+  // Redirect guests to sign in
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/api/auth/signin');
+    }
+  }, [status, router]);
+
   async function fetchPlaylists() {
     try {
       const res = await fetch('/api/playlists');
+      if (res.status === 401) { router.push('/api/auth/signin'); return; }
       const data = await res.json();
       setPlaylists(data);
     } catch {
@@ -23,8 +43,8 @@ export default function PlaylistsPage() {
   }
 
   useEffect(() => {
-    fetchPlaylists();
-  }, []);
+    if (status === 'authenticated') fetchPlaylists();
+  }, [status]);
 
   async function createPlaylist(e: React.FormEvent) {
     e.preventDefault();
@@ -37,6 +57,9 @@ export default function PlaylistsPage() {
     if (res.ok) {
       setNewName('');
       fetchPlaylists();
+    } else {
+      const data = await res.json();
+      setError(data.error ?? 'Failed to create playlist');
     }
   }
 
@@ -46,65 +69,67 @@ export default function PlaylistsPage() {
     fetchPlaylists();
   }
 
+  // Show loading while session is being checked
+  if (status === 'loading' || loading) {
+    return <main className="container mt-4"><p className="text-muted">Loading...</p></main>;
+  }
+
   return (
-    <main style={{ maxWidth: 800, margin: '40px auto', padding: '0 20px', fontFamily: 'sans-serif' }}>
-      <h1>My Playlists</h1>
+    <main className="container mt-4">
+      <h1 className="mb-1">Playlists</h1>
+      <p className="text-muted mb-4">
+        {isAdmin ? 'Admin — you can create and delete playlists.' : 'Viewing as user — sign in as admin to manage playlists.'}
+      </p>
 
-      <form onSubmit={createPlaylist} style={{ display: 'flex', gap: 10, marginBottom: 30 }}>
-        <input
-          type="text"
-          placeholder="New playlist name"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          maxLength={100}
-          style={{ flex: 1, padding: '8px 12px', fontSize: 16, border: '1px solid #ccc', borderRadius: 4 }}
-        />
-        <button
-          type="submit"
-          style={{ padding: '8px 20px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 16 }}
-        >
-          Create
-        </button>
-      </form>
+      {error && <div className="alert alert-danger">{error}</div>}
 
-      {loading && <p>Loading...</p>}
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-
-      {!loading && playlists.length === 0 && (
-        <p style={{ color: '#666' }}>No playlists yet. Create one above!</p>
+      {/* Create form — admins only */}
+      {isAdmin && (
+        <form onSubmit={createPlaylist} className="d-flex gap-2 mb-4">
+          <input
+            type="text"
+            className="form-control"
+            placeholder="New playlist name..."
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            maxLength={100}
+          />
+          <button type="submit" className="btn btn-primary">Create</button>
+        </form>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
+      {playlists.length === 0 && (
+        <p className="text-muted">No playlists yet{isAdmin ? ' — create one above!' : '.'}</p>
+      )}
+
+      {/* Playlist cards grid */}
+      <div className="row g-3">
         {playlists.map((pl) => (
-          <div
-            key={pl.id}
-            style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, background: '#fafafa' }}
-          >
-            <h3 style={{ margin: '0 0 8px' }}>{pl.name}</h3>
-            <p style={{ margin: '0 0 12px', color: '#666', fontSize: 14 }}>
-              {new Date(pl.created_at!).toLocaleDateString()}
-            </p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <Link
-                href={`/playlists/${pl.id}`}
-                style={{ flex: 1, textAlign: 'center', padding: '6px 0', background: '#0070f3', color: '#fff', borderRadius: 4, textDecoration: 'none', fontSize: 14 }}
-              >
-                View
-              </Link>
-              <button
-                onClick={() => deletePlaylist(pl.id)}
-                style={{ flex: 1, padding: '6px 0', background: '#e00', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 }}
-              >
-                Delete
-              </button>
+          <div key={pl.id} className="col-sm-6 col-md-4 col-lg-3">
+            <div className="card h-100">
+              <div className="card-body">
+                <h5 className="card-title">{pl.name}</h5>
+                <p className="card-text text-muted" style={{ fontSize: '0.85rem' }}>
+                  {pl.created_at ? new Date(pl.created_at).toLocaleDateString() : ''}
+                </p>
+              </div>
+              <div className="card-footer d-flex gap-2">
+                <Link href={`/playlists/${pl.id}`} className="btn btn-primary btn-sm flex-fill">
+                  View
+                </Link>
+                {/* Delete is admin only */}
+                {isAdmin && (
+                  <button
+                    onClick={() => deletePlaylist(pl.id)}
+                    className="btn btn-outline-danger btn-sm flex-fill"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
-      </div>
-
-      <div style={{ marginTop: 40, borderTop: '1px solid #eee', paddingTop: 20 }}>
-        <Link href="/admin/playlists" style={{ marginRight: 16, color: '#0070f3' }}>Admin: All Playlists</Link>
-        <Link href="/admin/stats" style={{ color: '#0070f3' }}>Admin: Stats</Link>
       </div>
     </main>
   );

@@ -1,24 +1,43 @@
 'use client';
+// playlists/[id]/page.tsx — Playlist Detail Page
+// RBAC:
+//   Guest   → redirected to sign in
+//   User    → can view tracks only
+//   Admin   → can rename, delete playlist and add/remove tracks
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
-import { Playlist, Track } from '@/app/lib/types';
+import { Playlist, Album, Track } from '@/app/lib/types';
 
 export default function PlaylistDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { data: session, status } = useSession();
 
   const [playlist, setPlaylist] = useState<Playlist | null>(null);
-  const [trackIdInput, setTrackIdInput] = useState('');
   const [editName, setEditName] = useState('');
   const [editing, setEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  // All albums with tracks — used to populate the track picker
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [selectedTrackId, setSelectedTrackId] = useState('');
+  const [trackSearch, setTrackSearch] = useState('');
+
+  const isAdmin = session?.user?.role === 'admin';
+
+  // Redirect guests to sign in
+  useEffect(() => {
+    if (status === 'unauthenticated') router.push('/api/auth/signin');
+  }, [status, router]);
+
   async function fetchPlaylist() {
     try {
       const res = await fetch(`/api/playlists/${id}`);
+      if (res.status === 401) { router.push('/api/auth/signin'); return; }
       if (!res.ok) { setError('Playlist not found'); return; }
       const data = await res.json();
       setPlaylist(data);
@@ -30,19 +49,62 @@ export default function PlaylistDetailPage() {
     }
   }
 
-  useEffect(() => { fetchPlaylist(); }, [id]);
+  // Load all albums so admin can pick a track by name
+  async function fetchAlbums() {
+    try {
+      const res = await fetch('/api/albums');
+      const data = await res.json();
+      setAlbums(data);
+    } catch {
+      // Non-critical — just means the picker won't have options
+    }
+  }
+
+  useEffect(() => {
+    if (status === 'authenticated') {
+      fetchPlaylist();
+      if (isAdmin) fetchAlbums();
+    }
+  }, [id, status, isAdmin]);
+
+  // Flatten all tracks from all albums into a searchable list
+  const allTracks = albums.flatMap((album) =>
+    (album.tracks ?? []).map((track) => ({
+      ...track,
+      albumTitle: album.title,
+      albumArtist: album.artist,
+    }))
+  );
+
+  // Filter tracks by search phrase
+  const filteredTracks = trackSearch.trim()
+    ? allTracks.filter(
+        (t) =>
+          t.title.toLowerCase().includes(trackSearch.toLowerCase()) ||
+          t.albumTitle.toLowerCase().includes(trackSearch.toLowerCase())
+      )
+    : allTracks;
 
   async function addTrack(e: React.FormEvent) {
     e.preventDefault();
-    const trackId = parseInt(trackIdInput, 10);
+    const trackId = parseInt(selectedTrackId, 10);
     if (isNaN(trackId)) return;
+
+    // Check if track is already in the playlist
+    const alreadyAdded = playlist?.tracks?.some((t) => t.id === trackId);
+    if (alreadyAdded) {
+      alert('That track is already in this playlist.');
+      return;
+    }
+
     const res = await fetch(`/api/playlists/${id}/songs`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ track_id: trackId, position: playlist?.tracks?.length ?? 0 }),
     });
     if (res.ok) {
-      setTrackIdInput('');
+      setSelectedTrackId('');
+      setTrackSearch('');
       fetchPlaylist();
     } else {
       const data = await res.json();
@@ -73,73 +135,121 @@ export default function PlaylistDetailPage() {
     router.push('/playlists');
   }
 
-  if (loading) return <main style={{ maxWidth: 800, margin: '40px auto', padding: '0 20px', fontFamily: 'sans-serif' }}><p>Loading...</p></main>;
-  if (error) return <main style={{ maxWidth: 800, margin: '40px auto', padding: '0 20px', fontFamily: 'sans-serif' }}><p style={{ color: 'red' }}>{error}</p><Link href="/playlists">Back</Link></main>;
+  if (status === 'loading' || loading) {
+    return <main className="container mt-4"><p className="text-muted">Loading...</p></main>;
+  }
+
+  if (error) {
+    return (
+      <main className="container mt-4">
+        <div className="alert alert-danger">{error}</div>
+        <Link href="/playlists" className="btn btn-secondary">Back to Playlists</Link>
+      </main>
+    );
+  }
 
   return (
-    <main style={{ maxWidth: 800, margin: '40px auto', padding: '0 20px', fontFamily: 'sans-serif' }}>
-      <Link href="/playlists" style={{ color: '#0070f3', fontSize: 14 }}>← Back to Playlists</Link>
+    <main className="container mt-4">
+      <Link href="/playlists" className="text-muted text-decoration-none">← Back to Playlists</Link>
 
-      <div style={{ marginTop: 16, marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
+      {/* Playlist title + admin controls */}
+      <div className="d-flex align-items-center gap-3 mt-3 mb-4">
         {editing ? (
-          <form onSubmit={saveEdit} style={{ display: 'flex', gap: 8, flex: 1 }}>
+          <form onSubmit={saveEdit} className="d-flex gap-2 flex-fill">
             <input
+              className="form-control"
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               maxLength={100}
-              style={{ flex: 1, padding: '6px 10px', fontSize: 20, border: '1px solid #ccc', borderRadius: 4 }}
             />
-            <button type="submit" style={{ padding: '6px 14px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer' }}>Save</button>
-            <button type="button" onClick={() => setEditing(false)} style={{ padding: '6px 14px', border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer' }}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Save</button>
+            <button type="button" className="btn btn-outline-secondary" onClick={() => setEditing(false)}>Cancel</button>
           </form>
         ) : (
           <>
-            <h1 style={{ margin: 0 }}>{playlist?.name}</h1>
-            <button onClick={() => setEditing(true)} style={{ padding: '4px 12px', border: '1px solid #ccc', borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>Rename</button>
-            <button onClick={deletePlaylist} style={{ padding: '4px 12px', background: '#e00', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 14 }}>Delete Playlist</button>
+            <h1 className="mb-0">{playlist?.name}</h1>
+            {isAdmin && (
+              <>
+                <button className="btn btn-outline-secondary btn-sm" onClick={() => setEditing(true)}>Rename</button>
+                <button className="btn btn-outline-danger btn-sm" onClick={deletePlaylist}>Delete</button>
+              </>
+            )}
           </>
         )}
       </div>
 
-      <h2 style={{ fontSize: 18 }}>Tracks ({playlist?.tracks?.length ?? 0})</h2>
-
+      {/* Track list */}
+      <h5>Tracks ({playlist?.tracks?.length ?? 0})</h5>
       {playlist?.tracks?.length === 0 && (
-        <p style={{ color: '#666' }}>No tracks yet. Add one below.</p>
+        <p className="text-muted">{isAdmin ? 'No tracks yet — add one below.' : 'No tracks in this playlist.'}</p>
       )}
-
-      <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px' }}>
+      <ul className="list-group mb-4">
         {playlist?.tracks?.map((track: Track) => (
-          <li key={track.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid #eee' }}>
+          <li key={track.id} className="list-group-item d-flex justify-content-between align-items-center">
             <span>
               <strong>{track.number}.</strong> {track.title}
-              <span style={{ color: '#999', fontSize: 13, marginLeft: 8 }}>(ID: {track.id})</span>
             </span>
-            <button
-              onClick={() => removeTrack(track.id!)}
-              style={{ padding: '4px 10px', background: '#e00', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 13 }}
-            >
-              Remove
-            </button>
+            {isAdmin && (
+              <button onClick={() => removeTrack(track.id!)} className="btn btn-outline-danger btn-sm">
+                Remove
+              </button>
+            )}
           </li>
         ))}
       </ul>
 
-      <form onSubmit={addTrack} style={{ display: 'flex', gap: 10 }}>
-        <input
-          type="number"
-          placeholder="Track ID to add"
-          value={trackIdInput}
-          onChange={(e) => setTrackIdInput(e.target.value)}
-          style={{ flex: 1, padding: '8px 12px', fontSize: 16, border: '1px solid #ccc', borderRadius: 4 }}
-        />
-        <button
-          type="submit"
-          style={{ padding: '8px 20px', background: '#0070f3', color: '#fff', border: 'none', borderRadius: 4, cursor: 'pointer', fontSize: 16 }}
-        >
-          Add Track
-        </button>
-      </form>
-      <p style={{ color: '#999', fontSize: 13, marginTop: 6 }}>Enter the track ID from your database.</p>
+      {/* Add track picker — admin only */}
+      {isAdmin && (
+        <div className="card p-3">
+          <h6 className="mb-3">Add a Track</h6>
+
+          {/* Search box to filter the track list */}
+          <input
+            type="text"
+            className="form-control mb-2"
+            placeholder="Search by track or album name..."
+            value={trackSearch}
+            onChange={(e) => setTrackSearch(e.target.value)}
+          />
+
+          {/* Scrollable track list */}
+          <div className="border rounded mb-3" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+            {filteredTracks.length === 0 && (
+              <p className="text-muted p-3 mb-0">No tracks found.</p>
+            )}
+            {filteredTracks.map((track) => (
+              <div
+                key={track.id}
+                className={`p-2 px-3 border-bottom ${selectedTrackId === String(track.id) ? 'bg-primary text-white' : ''}`}
+                style={{ cursor: 'pointer', fontSize: '0.9rem' }}
+                onClick={() => setSelectedTrackId(String(track.id))}
+              >
+                <strong>{track.title}</strong>
+                <span className={`ms-2 ${selectedTrackId === String(track.id) ? 'text-white-50' : 'text-muted'}`}>
+                  — {track.albumTitle} · Track {track.number}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <form onSubmit={addTrack} className="d-flex gap-2">
+            <input
+              type="text"
+              className="form-control"
+              readOnly
+              value={
+                selectedTrackId
+                  ? allTracks.find((t) => String(t.id) === selectedTrackId)?.title ?? ''
+                  : ''
+              }
+              placeholder="Select a track above..."
+            />
+            <button type="submit" className="btn btn-primary" disabled={!selectedTrackId}>
+              Add
+            </button>
+          </form>
+        </div>
+      )}
     </main>
   );
 }
